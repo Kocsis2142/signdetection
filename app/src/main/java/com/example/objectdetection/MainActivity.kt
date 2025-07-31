@@ -158,5 +158,55 @@ class MainActivity : ComponentActivity() {
         Utils.matToBitmap(dstMat, cropped)
         return cropped
     }
+    fun drawSignatureDebug(bitmap: Bitmap, frameRect: RotatedRect, maxOutsideRatio: Double = 0.1): Bitmap {
+        val mat = Mat()
+        Utils.bitmapToMat(bitmap, mat)
+
+        val gray = Mat()
+        Imgproc.cvtColor(mat, gray, Imgproc.COLOR_BGR2GRAY)
+        Imgproc.GaussianBlur(gray, gray, Size(5.0, 5.0), 0.0)
+        Imgproc.threshold(gray, gray, 0.0, 255.0, Imgproc.THRESH_BINARY_INV + Imgproc.THRESH_OTSU)
+
+        val mask = Mat.zeros(mat.size(), CvType.CV_8UC1)
+        val boxPoints = MatOfPoint()
+        frameRect.points().map { Point(it.x, it.y) }.toTypedArray().let {
+            boxPoints.fromArray(*it)
+        }
+        Imgproc.fillConvexPoly(mask, boxPoints, Scalar(255.0))
+
+        val outside = Mat()
+        Core.bitwise_and(gray, gray, outside, mask.inv())
+
+        // Színes debug kép
+        val debugMat = Mat.zeros(mat.size(), CvType.CV_8UC3)
+
+        val blue = Mat(debugMat.size(), debugMat.type(), Scalar(255.0, 0.0, 0.0))
+        blue.copyTo(debugMat, gray)
+
+        val red = Mat(debugMat.size(), debugMat.type(), Scalar(0.0, 0.0, 255.0))
+        red.copyTo(debugMat, outside)
+
+        Imgproc.polylines(debugMat, listOf(boxPoints), true, Scalar(0.0, 255.0, 0.0), 3)
+
+        // ✅ Outside ratio kiszámítása és ráírás
+        val totalSignaturePixels = Core.countNonZero(gray)
+        val outsidePixels = Core.countNonZero(outside)
+        val outsideRatio = if (totalSignaturePixels == 0) 0.0 else outsidePixels.toDouble() / totalSignaturePixels
+
+        Imgproc.putText(
+            debugMat,
+            "Outside: %.2f (max: %.2f)".format(outsideRatio, maxOutsideRatio),
+            Point(30.0, 50.0),
+            Imgproc.FONT_HERSHEY_SIMPLEX,
+            1.2,
+            if (outsideRatio > maxOutsideRatio) Scalar(0.0, 0.0, 255.0) else Scalar(0.0, 255.0, 0.0),
+            2
+        )
+
+        val result = Bitmap.createBitmap(debugMat.width(), debugMat.height(), Bitmap.Config.ARGB_8888)
+        Utils.matToBitmap(debugMat, result)
+        return result
+    }
+
 
 }
