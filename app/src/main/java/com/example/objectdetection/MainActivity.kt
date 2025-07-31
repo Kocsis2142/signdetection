@@ -167,17 +167,21 @@ class MainActivity : ComponentActivity() {
         Imgproc.GaussianBlur(gray, gray, Size(5.0, 5.0), 0.0)
         Imgproc.threshold(gray, gray, 0.0, 255.0, Imgproc.THRESH_BINARY_INV + Imgproc.THRESH_OTSU)
 
-        val mask = Mat.zeros(mat.size(), CvType.CV_8UC1)
+        // ✅ Keret pontok átalakítása
         val boxPoints = MatOfPoint()
-        frameRect.points().map { Point(it.x, it.y) }.toTypedArray().let {
-            boxPoints.fromArray(*it)
-        }
+        val rectPoints = Array(4) { Point() }
+        frameRect.points(rectPoints)
+        boxPoints.fromArray(*rectPoints)
+
+        // ✅ Maszk a keretre
+        val mask = Mat.zeros(mat.size(), CvType.CV_8UC1)
         Imgproc.fillConvexPoly(mask, boxPoints, Scalar(255.0))
 
+        // ✅ Kívül eső pixelek
         val outside = Mat()
         Core.bitwise_and(gray, gray, outside, mask.inv())
 
-        // Színes debug kép
+        // ✅ Színes debug kép
         val debugMat = Mat.zeros(mat.size(), CvType.CV_8UC3)
 
         val blue = Mat(debugMat.size(), debugMat.type(), Scalar(255.0, 0.0, 0.0))
@@ -188,11 +192,12 @@ class MainActivity : ComponentActivity() {
 
         Imgproc.polylines(debugMat, listOf(boxPoints), true, Scalar(0.0, 255.0, 0.0), 3)
 
-        // ✅ Outside ratio kiszámítása és ráírás
+        // ✅ Outside ratio számítás
         val totalSignaturePixels = Core.countNonZero(gray)
         val outsidePixels = Core.countNonZero(outside)
         val outsideRatio = if (totalSignaturePixels == 0) 0.0 else outsidePixels.toDouble() / totalSignaturePixels
 
+        // ✅ Szöveg ráírás
         Imgproc.putText(
             debugMat,
             "Outside: %.2f (max: %.2f)".format(outsideRatio, maxOutsideRatio),
@@ -207,6 +212,7 @@ class MainActivity : ComponentActivity() {
         Utils.matToBitmap(debugMat, result)
         return result
     }
+
 
 
 }
